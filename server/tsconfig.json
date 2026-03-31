@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "strictPropertyInitialization": false,
+    "ignoreDeprecations": "5.0"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
+

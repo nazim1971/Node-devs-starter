@@ -1,0 +1,26 @@
+{
+  "name": "node-devs-starter",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:dashboard": "npm run dev -w apps/dashboard",
+    "dev:shared": "npm run dev -w shared",
+    "dev": "concurrently \"npm run dev:shared\" \"npm run dev:server\" \"npm run dev:web\" \"npm run dev:dashboard\"",
+    "build:server": "npm run build -w server",
+    "build:web": "npm run build -w apps/web",
+    "build:dashboard": "npm run build -w apps/dashboard",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

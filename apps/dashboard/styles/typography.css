@@ -1,0 +1,197 @@
+/* ============================================================
+   TYPOGRAPHY
+   Font pairing: Sora (display/headings) + Inter (body)
+   Fluid scale using clamp(min, preferred, max)
+   ============================================================ */
+
+/* ---------- Google Fonts ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ---------- Fluid Font Scale ---------- */
+:root {
+  --text-xs:   clamp(0.694rem,  0.67rem  + 0.12vw, 0.75rem);
+  --text-sm:   clamp(0.833rem,  0.8rem   + 0.17vw, 0.9375rem);
+  --text-base: clamp(1rem,      0.96rem  + 0.2vw,  1.125rem);
+  --text-lg:   clamp(1.2rem,    1.14rem  + 0.3vw,  1.375rem);
+  --text-xl:   clamp(1.44rem,   1.35rem  + 0.45vw, 1.75rem);
+  --text-2xl:  clamp(1.728rem,  1.6rem   + 0.64vw, 2.25rem);
+  --text-3xl:  clamp(2.074rem,  1.9rem   + 0.87vw, 2.875rem);
+  --text-4xl:  clamp(2.488rem,  2.25rem  + 1.19vw, 3.625rem);
+  --text-5xl:  clamp(2.986rem,  2.65rem  + 1.68vw, 4.5rem);
+
+  --leading-none:    1;
+  --leading-tight:   1.25;
+  --leading-snug:    1.375;
+  --leading-normal:  1.6;
+  --leading-relaxed: 1.75;
+  --leading-loose:   2;
+
+  --tracking-tight:  -0.025em;
+  --tracking-normal:  0em;
+  --tracking-wide:    0.025em;
+  --tracking-wider:   0.05em;
+  --tracking-widest:  0.1em;
+
+  --font-thin:      300;
+  --font-normal:    400;
+  --font-medium:    500;
+  --font-semibold:  600;
+  --font-bold:      700;
+  --font-extrabold: 800;
+}
+
+/* ---------- Headings ---------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+  font-weight: var(--font-bold);
+}
+
+h1 {
+  font-size: var(--text-5xl);
+  font-weight: var(--font-extrabold);
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-bold);
+}
+
+h3 {
+  font-size: var(--text-3xl);
+}
+
+h4 {
+  font-size: var(--text-2xl);
+}
+
+h5 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+}
+
+h6 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+}
+
+/* ---------- Body Text ---------- */
+p {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+}
+
+.text-lead {
+  font-size: var(--text-xl);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-muted);
+  font-weight: var(--font-normal);
+}
+
+.text-body  { font-size: var(--text-base); line-height: var(--leading-normal); }
+.text-sm    { font-size: var(--text-sm);   line-height: var(--leading-normal); }
+.text-xs    { font-size: var(--text-xs);   line-height: var(--leading-normal); }
+
+/* ---------- Display / Hero Text ---------- */
+.text-display {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: var(--font-extrabold);
+  line-height: var(--leading-none);
+  letter-spacing: -0.04em;
+}
+
+/* ---------- Caption ---------- */
+.caption {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+  font-weight: var(--font-normal);
+}
+
+/* ---------- Label ---------- */
+label,
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+  line-height: var(--leading-snug);
+  display: block;
+}
+
+.label--required::after {
+  content: ' *';
+  color: var(--color-danger);
+}
+
+/* ---------- Code / Mono ---------- */
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+code {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.4em;
+}
+
+pre {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow-x: auto;
+  line-height: var(--leading-relaxed);
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+kbd {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.45em;
+  font-size: var(--text-xs);
+  box-shadow: 0 2px 0 var(--color-border-strong);
+}
+
+/* ---------- Utility Text Classes ---------- */
+.font-display   { font-family: var(--font-display); }
+.font-sans      { font-family: var(--font-sans); }
+.font-mono      { font-family: var(--font-mono); }
+
+.font-thin      { font-weight: var(--font-thin); }
+.font-normal    { font-weight: var(--font-normal); }
+.font-medium    { font-weight: var(--font-medium); }
+.font-semibold  { font-weight: var(--font-semibold); }
+.font-bold      { font-weight: var(--font-bold); }
+.font-extrabold { font-weight: var(--font-extrabold); }
+
+.leading-tight   { line-height: var(--leading-tight); }
+.leading-snug    { line-height: var(--leading-snug); }
+.leading-normal  { line-height: var(--leading-normal); }
+.leading-relaxed { line-height: var(--leading-relaxed); }
+
+.tracking-tight   { letter-spacing: var(--tracking-tight); }
+.tracking-normal  { letter-spacing: var(--tracking-normal); }
+.tracking-wide    { letter-spacing: var(--tracking-wide); }
+.tracking-widest  { letter-spacing: var(--tracking-widest); }
+
+.uppercase  { text-transform: uppercase; }
+.lowercase  { text-transform: lowercase; }
+.capitalize { text-transform: capitalize; }
