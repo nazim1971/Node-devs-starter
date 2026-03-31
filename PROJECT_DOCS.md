@@ -15,7 +15,7 @@
    - [What is NestJS?](#what-is-nestjs)
    - [main.ts — The Entry Point](#maints--the-entry-point)
    - [app.module.ts — The Root Module](#appmodulets--the-root-module)
-   - [Entities — Database Tables](#entities--database-tables)
+   - [Database — Prisma ORM](#database--prisma-orm)
    - [Auth Module](#auth-module)
    - [Users Module](#users-module)
    - [Admin Module](#admin-module)
@@ -339,7 +339,7 @@ This is the **root module** — it imports all the other modules to connect them
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),  // reads .env file
-    TypeOrmModule.forRootAsync({ ... }),        // connects to PostgreSQL
+    PrismaModule,                               // global Prisma database client
     AuthModule,
     UsersModule,
     CloudinaryModule,
@@ -351,116 +351,140 @@ export class AppModule {}
 
 **`ConfigModule`** — from `@nestjs/config`. Reads your `.env` file and makes every environment variable accessible anywhere via `ConfigService`. `isGlobal: true` means you don't have to import `ConfigModule` in every other module.
 
-**`TypeOrmModule`** — connects to the PostgreSQL database. The configuration is loaded asynchronously (using `forRootAsync`) because it needs to read the database URL from `ConfigService` (which comes from `.env`).
-
-Key TypeORM options:
-```ts
-{
-  type: 'postgres',
-  url: configService.get('DATABASE_URL'),
-  entities: [User, Session],    // tell TypeORM about your tables
-  synchronize: true,            // auto-creates/updates tables (ONLY in development!)
-  // In production: synchronize: false — use migrations instead
-}
-```
-
-> ⚠️ **Important:** `synchronize: true` is convenient in development — it automatically creates/alters database tables to match your entity classes. But in production it would be dangerous (could drop data), so it's disabled in production mode.
+**`PrismaModule`** — a custom global module at `server/src/prisma/`. It provides `PrismaService` (which wraps `PrismaClient`) to every other module in the app. Because it is decorated with `@Global()`, you can inject `PrismaService` anywhere without needing to import `PrismaModule` in each feature module separately.
 
 ---
 
-### Entities — Database Tables
+### Database — Prisma ORM
 
-NestJS uses **TypeORM** to interact with PostgreSQL. Instead of writing SQL, you define **Entity** classes, and TypeORM handles the SQL.
+**Location:** `server/prisma/`
 
-#### `server/src/modules/users/entities/user.entity.ts`
+This project uses **Prisma** as its ORM (Object-Relational Mapper). Prisma has two parts:
 
-This class maps to the `users` table in PostgreSQL.
+1. **`schema.prisma`** — defines your database models (tables, columns, relations) in a clean DSL
+2. **`PrismaClient`** — a fully type-safe auto-generated database client based on your schema
 
-```ts
-@Entity('users')           // this class = the "users" table
-export class User {
+#### `server/prisma/schema.prisma`
 
-  @PrimaryGeneratedColumn('uuid')
-  id: string;              // automatically generates a UUID like "a1b2-c3d4-..."
+```prisma
+model User {
+  id                   String    @id @default(uuid())
+  name                 String    @db.VarChar(100)
+  email                String    @unique @db.VarChar(255)
+  password             String
+  avatar               String?   @db.VarChar(500)
+  role                 Role      @default(user)
+  isActive             Boolean   @default(true)
+  isBanned             Boolean   @default(false)
+  passwordResetToken   String?   @db.VarChar(100)
+  passwordResetExpires DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+  sessions             Session[]
+  @@map("users")
+}
 
-  @Column({ length: 100 })
-  name: string;
-
-  @Column({ unique: true, length: 255 })
-  email: string;           // no two users can have the same email
-
-  @Column({ select: false })
-  password: string;        // IMPORTANT: select: false means this column is NEVER
-                           // returned by default. You must explicitly ask for it.
-                           // This prevents accidentally leaking passwords in responses.
-
-  @Column({ nullable: true })
-  avatar: string | null;
-
-  @Column({ type: 'enum', enum: Role, default: Role.USER })
-  role: Role;
-
-  @Column({ default: true })
-  isActive: boolean;
-
-  @Column({ default: false })
-  isBanned: boolean;
-
-  @Column({ nullable: true })
-  passwordResetToken: string | null;   // temporary token for password reset
-
-  @Column({ nullable: true })
-  passwordResetExpires: Date | null;   // when that token expires
-
-  @CreateDateColumn()
-  createdAt: Date;         // auto-set when record is created
-
-  @UpdateDateColumn()
-  updatedAt: Date;         // auto-set when record is updated
-
-  @DeleteDateColumn()
-  deletedAt: Date | null;  // for "soft delete" — see below
-
-  @OneToMany(() => Session, session => session.user, { cascade: true })
-  sessions: Session[];
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @db.VarChar(1000)
+  ip           String?  @db.VarChar(100)
+  userAgent    String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("sessions")
 }
 ```
 
-**Soft Delete:** Instead of permanently deleting a user from the database, TypeORM sets `deletedAt` to the current timestamp. The user is hidden from all future queries automatically. This means you can restore a user later, or keep audit logs.
+Key Prisma schema syntax:
 
-#### `server/src/modules/users/entities/session.entity.ts`
+| Syntax | What it means |
+|---|---|
+| `@id` | Primary key |
+| `@default(uuid())` | Auto-generates a UUID on insert |
+| `@unique` | No duplicate values allowed in this column |
+| `@db.VarChar(255)` | Maps to `VARCHAR(255)` in PostgreSQL |
+| `?` (e.g. `String?`) | Nullable — the column can be `NULL` |
+| `@default(now())` | Auto-sets to current timestamp on insert |
+| `@updatedAt` | Auto-updates timestamp on every record change |
+| `@@map("users")` | The actual PostgreSQL table name is `users` |
+| `onDelete: Cascade` | Deleting a User also deletes all their Sessions |
 
-Tracks active login sessions (used for refresh tokens).
-
-```ts
-@Entity('sessions')
-export class Session {
-
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column()
-  userId: string;          // which user this session belongs to
-
-  @Column({ length: 1000 })
-  refreshToken: string;    // the actual JWT refresh token, stored in DB
-
-  @Column({ nullable: true })
-  ip: string | null;       // IP address of the client
-
-  @Column({ nullable: true })
-  userAgent: string | null; // browser/device info
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @ManyToOne(() => User, user => user.sessions, { onDelete: 'CASCADE' })
-  user: User;              // if the User is deleted, all their sessions are deleted too
-}
-```
+**Soft Delete:** Instead of permanently removing a user, queries set `deletedAt` to the current timestamp. All queries filter `where: { deletedAt: null }` to exclude soft-deleted users, preserving audit history.
 
 **Why store sessions in the database?**
-JWTs are self-contained — you normally don't need a database to verify them. But if you store the refresh token in the DB, you can **invalidate sessions** (log out all devices) by deleting records from this table. Without this, a refresh token would be valid until it expires, even after logout.
+JWTs are self-contained — you normally don't need a database to verify them. But storing the refresh token in the `sessions` table lets you **invalidate sessions** (log out all devices) by deleting rows. Without this, a refresh token would remain valid until it naturally expires, even after logout.
+
+#### `server/src/prisma/prisma.service.ts`
+
+```ts
+@Injectable()
+export class PrismaService extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy {
+
+  async onModuleInit() {
+    await this.$connect();    // opens DB connection when the app starts
+  }
+
+  async onModuleDestroy() {
+    await this.$disconnect(); // closes DB connection on shutdown
+  }
+}
+```
+
+`PrismaService` extends `PrismaClient` so it inherits all the generated query methods (`prisma.user.findMany()`, `prisma.session.create()`, etc.) and is also a proper NestJS injectable.
+
+#### Common Prisma Patterns
+
+```ts
+// Find one — returns null if not found
+const user = await this.prisma.user.findUnique({ where: { email } });
+
+// Find many with filters + pagination
+const users = await this.prisma.user.findMany({
+  where: { deletedAt: null },
+  orderBy: { createdAt: 'desc' },
+  skip: 0,
+  take: 10,
+});
+
+// Create
+const user = await this.prisma.user.create({
+  data: { name, email, password: hashedPassword },
+});
+
+// Update
+await this.prisma.user.update({
+  where: { id: user.id },
+  data: { passwordResetToken: token },
+});
+
+// Soft delete
+await this.prisma.user.update({
+  where: { id },
+  data: { deletedAt: new Date() },
+});
+
+// Transaction — both queries run together or both fail
+const [users, total] = await this.prisma.$transaction([
+  this.prisma.user.findMany({ ... }),
+  this.prisma.user.count({ ... }),
+]);
+```
+
+#### Database Commands
+
+```bash
+cd server
+npm run db:generate   # regenerate PrismaClient after schema changes
+npm run db:push       # push schema to DB without a migration file (dev only)
+npm run db:migrate    # create + run a migration file (recommended)
+npm run db:studio     # open Prisma Studio — visual DB browser in your browser
+npm run db:seed       # seed the first admin user
+```
+
+> After any change to `schema.prisma`, always run `npm run db:generate` to update the TypeScript types.
 
 ---
 
@@ -475,18 +499,19 @@ Handles everything related to authentication: register, login, logout, password 
 ```ts
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session]),  // register entities for this module
-    JwtModule.registerAsync({ ... }),           // configure JWT signing
-    UsersModule,                                // needs UsersService
+    ConfigModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({}),  // JWT secrets passed per-call from ConfigService
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
+  exports: [AuthService],
 })
 ```
 
-`TypeOrmModule.forFeature([User, Session])` — registers the `User` and `Session` repositories so they can be injected into `AuthService` using `@InjectRepository(User)`.
+`JwtModule.register({})` — provided by `@nestjs/jwt`. Secrets are passed per-call inside `generateTokens()` via `ConfigService`, so no upfront configuration is needed here.
 
-`JwtModule` — provided by `@nestjs/jwt`. Configured with your secret keys from `.env`.
+`PrismaModule` is `@Global()`, so `PrismaService` is available to `AuthService` without importing anything extra in this module.
 
 #### `auth.controller.ts`
 
@@ -598,7 +623,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: { sub: string; email: string; role: Role }) {
     // This runs automatically after the JWT signature is verified
-    const user = await this.usersRepository.findOne({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.isBanned || !user.isActive) {
       throw new UnauthorizedException();
     }
@@ -642,17 +667,22 @@ All routes require `JwtAuthGuard` (must be logged in) and `RolesGuard` (must hav
 
 **`findAll({ page, limit })`:**
 ```ts
-// TypeORM query with pagination:
-const [users, total] = await this.usersRepository.findAndCount({
-  order: { createdAt: 'DESC' },
-  skip: (page - 1) * limit,   // e.g. page 2, limit 10 → skip 10
-  take: limit,
-});
-return { users, pagination: { page, limit, total, totalPages: Math.ceil(total/limit) } };
+// Prisma query with pagination (runs as a transaction):
+const [users, total] = await this.prisma.$transaction([
+  this.prisma.user.findMany({
+    where: { deletedAt: null },
+    select: SAFE_USER_SELECT,   // explicit field list — password is never returned
+    skip: (page - 1) * limit,  // e.g. page 2, limit 10 → skip 10
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+  }),
+  this.prisma.user.count({ where: { deletedAt: null } }),
+]);
+return { users, total, page, limit, totalPages: Math.ceil(total / limit) };
 ```
 
 **`changePassword(id, dto)`:**
-1. Fetches user WITH password field (using explicit `select`)
+1. Fetches user with `prisma.user.findUnique({ where: { id } })` — `password` is included by default
 2. `bcrypt.compare(dto.currentPassword, user.password)` → throws 401 if wrong
 3. Hashes new password and saves
 
@@ -690,7 +720,33 @@ Returns a statistics object for the dashboard home page:
 }
 ```
 
-**User growth** is calculated by querying the database 6 times — once per month — using `BETWEEN start AND end` date filters, going back 6 months from today.
+**User growth** is calculated by querying the database 6 times — once per month — using `createdAt: { gte: start, lt: end }` Prisma filters, going back 6 months from today.
+
+#### Creating the First Admin
+
+Since the `admin` role cannot be self-assigned through the API, the project includes a Prisma seed script to bootstrap the first admin user.
+
+**Run once after setting up the database:**
+```bash
+cd server
+npm run db:seed
+```
+
+This creates a user with `role: admin` using these defaults:
+
+| Field | Default | Override via |
+|---|---|---|
+| Email | `admin@example.com` | `ADMIN_EMAIL` in `server/.env` |
+| Password | `Admin1234!` | `ADMIN_PASSWORD` in `server/.env` |
+| Name | `Admin` | `ADMIN_NAME` in `server/.env` |
+
+The seed script is **idempotent** — it checks if a user with that email already exists and skips creation if so. Safe to run multiple times.
+
+**Alternative — promote an existing user via Prisma Studio:**
+```bash
+cd server && npm run db:studio
+```
+Open your browser, find the user in the `users` table, and change their `role` field to `admin`.
 
 ---
 
@@ -1198,7 +1254,7 @@ Dashboard /users page mounts
         RolesGuard: reads @Roles(Role.ADMIN) → checks user.role === 'admin'
         UsersController.findAll({ page: 1, limit: 10 })
           └── UsersService.findAll()
-                └── TypeORM: SELECT * FROM users ORDER BY createdAt DESC LIMIT 10
+                └── Prisma: prisma.user.findMany({ where: { deletedAt: null }, skip, take, orderBy })
                 └── Returns { users: [...], pagination: {...} }
           └── LoggerInterceptor: logs "GET /api/users 200 +12ms"
           └── ResponseTransformInterceptor: wraps in ApiResponse
@@ -1226,8 +1282,10 @@ useUsers() updates state → React re-renders the DataTable
 | **Interceptor** | Wraps request/response; can transform data |
 | **Filter** | Catches exceptions and formats error responses |
 | **Pipe** | Validates or transforms incoming data |
-| **Entity** | A TypeORM class that maps to a database table |
-| **Repository** | TypeORM object used to query a table |
+| **Prisma** | Type-safe ORM used to query PostgreSQL |
+| **PrismaClient** | Auto-generated database client based on `schema.prisma` |
+| **Prisma Schema** | `server/prisma/schema.prisma` — defines models, fields, relations |
+| **PrismaService** | NestJS service wrapping `PrismaClient`; injected wherever DB access is needed |
 | **JWT** | JSON Web Token — a signed, self-contained auth token |
 | **Access Token** | Short-lived JWT (15m) used for authentication |
 | **Refresh Token** | Long-lived JWT (7d) used to get new access tokens |

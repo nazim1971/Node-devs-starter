@@ -1,4 +1,3 @@
-import '../styles/home.css';
 import { Header } from '../src/components/Header';
 import { Footer } from '../src/components/Footer';
 import { HeroSection } from '../src/sections/HeroSection';

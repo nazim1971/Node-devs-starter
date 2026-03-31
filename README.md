@@ -9,8 +9,7 @@ Industry-level full-stack monorepo template.
 | Frontend | Next.js 14 (App Router, TypeScript) |
 | Admin | Next.js 14 (App Router, TypeScript) |
 | Backend | NestJS (TypeScript, modular) |
-| Database | PostgreSQL 16 (TypeORM) |
-| Cache | Redis 7 (ioredis) |
+| Database | PostgreSQL 16 (Prisma ORM) |
 | Images | Cloudinary |
 | Validation | Zod (shared between frontend & backend) |
 | Styling | Raw CSS + CSS Variables only |
@@ -51,9 +50,18 @@ cp server/.env.example server/.env
 cp apps/web/.env.example apps/web/.env.local
 cp apps/dashboard/.env.example apps/dashboard/.env.local
 ```
-Fill in `server/.env` with your Cloudinary credentials and strong JWT secrets.
+Fill in `server/.env` with your Cloudinary credentials, `DATABASE_URL`, and strong JWT secrets.
 
-### 5. Run everything
+### 5. Set up the database
+```bash
+cd server
+npx prisma migrate dev   # run migrations (creates tables)
+npm run db:seed          # create the first admin user
+cd ..
+```
+> Default admin: `admin@example.com` / `Admin1234!` — override via `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `server/.env`.
+
+### 6. Run everything
 ```bash
 npm dev           # all three apps concurrently
 # or individually:
@@ -104,10 +112,10 @@ npm dev:dashboard # Admin   → http://localhost:3001
 ## Auth Flow
 
 - **Access token**: JWT, 15 min expiry, signed with `JWT_ACCESS_SECRET`
-- **Refresh token**: JWT, 7 day expiry, stored in Redis + DB session
-- **Rotation**: every `/auth/refresh` call issues new tokens (old invalidated)
-- **Logout**: access token blacklisted by `jti` in Redis, all sessions deleted
-- **Password reset**: UUID token stored in Redis with 1h TTL
+- **Refresh token**: JWT, 7 day expiry, stored in DB (`sessions` table via Prisma)
+- **Rotation**: every `/auth/refresh` call issues new tokens (session record updated in DB)
+- **Logout**: all sessions for the user deleted from the `sessions` table
+- **Password reset**: UUID token stored in DB columns (`passwordResetToken` + `passwordResetExpires`)
 
 ## Sessions Roadmap
 

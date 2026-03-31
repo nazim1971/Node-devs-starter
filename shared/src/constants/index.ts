@@ -18,6 +18,12 @@ export const API_ROUTES = {
   },
   UPLOAD: {
     AVATAR: "/upload/avatar",
+    IMAGE: "/upload/image",
+  },
+  PRODUCTS: {
+    BASE: "/products",
+    BY_SLUG: (slug: string) => `/products/${slug}`,
+    BY_ID: (id: string) => `/products/${id}`,
   },
 } as const;
 

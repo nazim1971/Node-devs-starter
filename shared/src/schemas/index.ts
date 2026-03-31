@@ -67,3 +67,24 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const createProductSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters").max(255),
+  slug: z
+    .string()
+    .min(2)
+    .max(255)
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Slug must be lowercase letters, numbers and hyphens only",
+    ),
+  description: z.string().min(1, "Description is required"),
+  price: z.number().positive("Price must be positive"),
+  image: z.string().url().nullable().optional(),
+  imagePublicId: z.string().nullable().optional(),
+});
+
+export const updateProductSchema = createProductSchema.partial();
+
+export type CreateProductInput = z.infer<typeof createProductSchema>;
+export type UpdateProductInput = z.infer<typeof updateProductSchema>;

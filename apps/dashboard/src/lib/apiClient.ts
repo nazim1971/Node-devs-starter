@@ -154,4 +154,8 @@ export const apiClient = {
   upload<T>(path: string, formData: FormData): Promise<ApiResponse<T>> {
     return request<T>(path, { method: "POST", body: formData });
   },
+
+  patchUpload<T>(path: string, formData: FormData): Promise<ApiResponse<T>> {
+    return request<T>(path, { method: "PATCH", body: formData });
+  },
 };

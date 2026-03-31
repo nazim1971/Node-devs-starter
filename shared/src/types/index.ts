@@ -71,3 +71,34 @@ export interface ChangePasswordPayload {
   newPassword: string;
   confirmPassword: string;
 }
+
+export interface Product {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  price: string;
+  image: string | null;
+  imagePublicId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface CreateProductPayload {
+  title: string;
+  slug: string;
+  description: string;
+  price: number;
+  image?: string | null;
+  imagePublicId?: string | null;
+}
+
+export interface UpdateProductPayload {
+  title?: string;
+  slug?: string;
+  description?: string;
+  price?: number;
+  image?: string | null;
+  imagePublicId?: string | null;
+}

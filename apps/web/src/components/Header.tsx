@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/#features', label: 'Features' },
   { href: '/#stats', label: 'Stats' },
   { href: '/#testimonials', label: 'Testimonials' },
+  { href: '/products', label: 'Products' },
 ];
 
 function Logo({ onClick }: { onClick?: () => void }) {

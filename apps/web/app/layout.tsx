@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import '../styles/design-tokens.css';
 import '../styles/typography.css';
+import '../styles/home.css';
 import '../styles/components.css';
 import '../styles/utilities.css';
 import '../styles/auth.css';
+import '../styles/products.css';
 import { ThemeProvider } from '../src/providers/ThemeProvider';
 import { AuthProvider } from '../src/providers/AuthProvider';
 
