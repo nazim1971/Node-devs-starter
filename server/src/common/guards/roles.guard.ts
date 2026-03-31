@@ -8,7 +8,7 @@ import { Reflector } from "@nestjs/core";
 import { Request } from "express";
 import { Role } from "@app/shared";
 import { ROLES_KEY } from "../decorators/roles.decorator";
-import { User } from "../../modules/users/entities/user.entity";
+import { User } from "@prisma/client";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -33,7 +33,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("Access denied");
     }
 
-    if (!requiredRoles.includes(user.role)) {
+    if (!requiredRoles.includes(user.role as unknown as Role)) {
       throw new ForbiddenException("Insufficient permissions");
     }
 

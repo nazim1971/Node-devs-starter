@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  editor
+  user
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  name                 String    @db.VarChar(100)
+  email                String    @unique @db.VarChar(255)
+  password             String
+  avatar               String?   @db.VarChar(500)
+  role                 Role      @default(user)
+  isActive             Boolean   @default(true)
+  isBanned             Boolean   @default(false)
+  passwordResetToken   String?   @db.VarChar(100)
+  passwordResetExpires DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @db.VarChar(1000)
+  ip           String?  @db.VarChar(100)
+  userAgent    String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}

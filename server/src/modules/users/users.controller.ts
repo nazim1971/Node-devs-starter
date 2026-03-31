@@ -25,7 +25,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
-import { User } from "./entities/user.entity";
+import { User } from "@prisma/client";
 import { z } from "zod";
 
 const changeRoleSchema = z.object({

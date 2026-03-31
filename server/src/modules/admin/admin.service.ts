@@ -1,13 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { User } from "../users/entities/user.entity";
+import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
 export class AdminService {
-  constructor(
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getStats() {
     const now = new Date();
@@ -15,38 +11,46 @@ export class AdminService {
 
     const [totalUsers, activeUsers, bannedUsers, newThisMonth] =
       await Promise.all([
-        this.userRepo.count(),
-        this.userRepo.count({ where: { isActive: true, isBanned: false } }),
-        this.userRepo.count({ where: { isBanned: true } }),
-        this.userRepo
-          .createQueryBuilder("u")
-          .where("u.createdAt >= :start", { start: startOfMonth })
-          .getCount(),
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.user.count({
+          where: { deletedAt: null, isActive: true, isBanned: false },
+        }),
+        this.prisma.user.count({ where: { deletedAt: null, isBanned: true } }),
+        this.prisma.user.count({
+          where: { deletedAt: null, createdAt: { gte: startOfMonth } },
+        }),
       ]);
 
     // Monthly growth: last 6 months
     const userGrowth: Array<{ label: string; value: number }> = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-      const value = await this.userRepo
-        .createQueryBuilder("u")
-        .where("u.createdAt >= :start AND u.createdAt < :end", {
-          start: d,
-          end,
-        })
-        .getCount();
-      const label = d.toLocaleString("default", {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+      const value = await this.prisma.user.count({
+        where: {
+          deletedAt: null,
+          createdAt: { gte: start, lt: end },
+        },
+      });
+      const label = start.toLocaleString("default", {
         month: "short",
         year: "2-digit",
       });
       userGrowth.push({ label, value });
     }
 
-    const recentSignups = await this.userRepo.find({
-      order: { createdAt: "DESC" },
+    const recentSignups = await this.prisma.user.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        role: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
       take: 10,
-      select: ["id", "name", "email", "avatar", "role", "createdAt"],
     });
 
     return {

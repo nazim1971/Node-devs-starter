@@ -22,7 +22,7 @@ import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
-import { User } from "../users/entities/user.entity";
+import { User } from "@prisma/client";
 
 // Server-side register schema — confirmPassword is client-only
 const registerServerSchema = z.object({
