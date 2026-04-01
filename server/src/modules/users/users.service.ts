@@ -13,24 +13,12 @@ import {
   PAGINATION_DEFAULTS,
 } from "@app/shared";
 import { PrismaService } from "../../prisma/prisma.service";
+import type {
+  PaginationQuery,
+  PaginatedUsers,
+} from "./interfaces/users.interfaces";
 
 const BCRYPT_ROUNDS = 12;
-
-export interface PaginationQuery {
-  page?: number;
-  limit?: number;
-}
-
-export interface PaginatedUsers {
-  users: Omit<
-    User,
-    "password" | "passwordResetToken" | "passwordResetExpires"
-  >[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
 
 const SAFE_USER_SELECT = {
   id: true,

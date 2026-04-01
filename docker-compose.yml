@@ -1,8 +1,14 @@
-version: '3.8'
+# docker-compose.yml — Development environment
+# Usage: docker compose up --build
+# All services run in development (watch) mode with bind-mounts for hot reload.
+
+version: '3.9'
 
 services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: devs_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-devuser}
@@ -16,14 +22,117 @@ services:
       - app_network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-devuser}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-devuser}']
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: devs_redis
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── NestJS API ──────────────────────────────────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: dev
+    container_name: devs_server
+    env_file: server/.env
+    environment:
+      NODE_ENV: development
+      PORT: '4000'
+      # Override DB/Redis URLs to use Docker service names
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devuser}:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/${POSTGRES_DB:-devdb}
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+    volumes:
+      # Bind-mount only the source dirs so nest --watch auto-reloads
+      - ./server/src:/app/server/src
+      - ./server/prisma:/app/server/prisma
+      - ./shared/src:/app/shared/src
+    ports:
+      - '4000:4000'
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Next.js Public App ──────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: devs_web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      # Internal URL used by server components in Docker network
+      API_URL: http://server:4000
+      NEXT_TELEMETRY_DISABLED: '1'
+    volumes:
+      - ./apps/web/app:/app/apps/web/app
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/styles:/app/apps/web/styles
+      - ./apps/web/public:/app/apps/web/public
+      - ./apps/web/next.config.js:/app/apps/web/next.config.js
+      - ./shared/src:/app/shared/src
+    ports:
+      - '3000:3000'
+    networks:
+      - app_network
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  # ── Next.js Dashboard App ───────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      target: dev
+    container_name: devs_dashboard
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      API_URL: http://server:4000
+      NEXT_TELEMETRY_DISABLED: '1'
+    volumes:
+      - ./apps/dashboard/app:/app/apps/dashboard/app
+      - ./apps/dashboard/src:/app/apps/dashboard/src
+      - ./apps/dashboard/styles:/app/apps/dashboard/styles
+      - ./apps/dashboard/next.config.js:/app/apps/dashboard/next.config.js
+      - ./shared/src:/app/shared/src
+    ports:
+      - '3001:3001'
+    networks:
+      - app_network
+    depends_on:
+      - server
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   app_network:
     driver: bridge
+

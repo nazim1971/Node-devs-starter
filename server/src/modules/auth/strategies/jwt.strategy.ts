@@ -5,14 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { Request } from "express";
 import { User } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
-
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-  iat?: number;
-  exp?: number;
-}
+import type { JwtPayload } from "../interfaces/auth.interfaces";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {

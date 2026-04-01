@@ -26,11 +26,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { User } from "@prisma/client";
-import { z } from "zod";
-
-const changeRoleSchema = z.object({
-  role: z.nativeEnum(Role),
-});
+import { changeRoleDtoSchema, type ChangeRoleDto } from "./dto";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -144,7 +140,7 @@ export class UsersController {
   @Roles(Role.ADMIN)
   async changeRole(
     @Param("id", ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(changeRoleSchema)) body: { role: Role },
+    @Body(new ZodValidationPipe(changeRoleDtoSchema)) body: ChangeRoleDto,
     @CurrentUser() currentUser: User,
   ) {
     if (currentUser.id === id) {

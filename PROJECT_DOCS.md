@@ -18,8 +18,9 @@
    - [Database — Prisma ORM](#database--prisma-orm)
    - [Auth Module](#auth-module)
    - [Users Module](#users-module)
+   - [Upload Module](#upload-module)
    - [Admin Module](#admin-module)
-   - [Cloudinary Module](#cloudinary-module)
+   - [Products Module](#products-module)
    - [Common Layer — Guards, Decorators, Filters, Interceptors, Pipes](#common-layer)
 7. [The Dashboard App (Admin Panel)](#7-the-dashboard-app-admin-panel)
 8. [The Web App (User-facing site)](#8-the-web-app-user-facing-site)
@@ -256,6 +257,59 @@ If a route ever changes, you change it in one place.
 
 **Location:** `server/src/`
 
+**Location:** `server/src/`
+
+The NestJS server follows a **feature-based module structure**. Every feature is a self-contained folder with its own controller, service, module, DTOs, and interfaces.
+
+```
+server/src/
+├── main.ts                  ← Bootstrap (Helmet, CORS, global prefix, filters)
+├── app.module.ts            ← Root module (imports all feature modules)
+├── modules/
+│   ├── auth/
+│   │   ├── dto/             ← register.dto.ts (server-side Zod schema)
+│   │   ├── interfaces/      ← SafeUser, JwtPayload, AuthResult
+│   │   ├── strategies/      ← jwt.strategy.ts (Passport JWT)
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   ├── auth.module.ts
+│   │   └── index.ts         ← barrel export
+│   ├── users/
+│   │   ├── dto/             ← update-profile, change-password, change-role
+│   │   ├── interfaces/      ← PaginationQuery, PaginatedUsers
+│   │   ├── users.controller.ts
+│   │   ├── users.service.ts
+│   │   ├── users.module.ts
+│   │   └── index.ts         ← barrel export
+│   ├── upload/
+│   │   ├── interfaces/      ← SignedUploadParams, UploadedImageResult
+│   │   ├── upload.controller.ts
+│   │   ├── upload.service.ts
+│   │   ├── upload.module.ts
+│   │   └── index.ts         ← barrel export
+│   ├── admin/
+│   │   ├── admin.controller.ts
+│   │   ├── admin.service.ts
+│   │   ├── admin.module.ts
+│   │   └── index.ts         ← barrel export
+│   └── products/
+│       ├── dto/             ← create-product, update-product
+│       ├── products.controller.ts
+│       ├── products.service.ts
+│       ├── products.module.ts
+│       └── index.ts         ← barrel export
+├── common/
+│   ├── decorators/          ← @CurrentUser(), @Roles()
+│   ├── filters/             ← HttpExceptionFilter
+│   ├── guards/              ← JwtAuthGuard, RolesGuard
+│   ├── interceptors/        ← LoggerInterceptor, ResponseTransformInterceptor
+│   ├── logger/              ← AppLogger (Winston-based)
+│   └── pipes/               ← ZodValidationPipe
+└── prisma/
+    ├── prisma.module.ts     ← @Global() — no need to import in each module
+    └── prisma.service.ts    ← PrismaClient wrapper
+```
+
 ### What is NestJS?
 
 NestJS is a framework for building server-side (backend) applications with Node.js, using TypeScript. It is inspired by Angular (a frontend framework) so it uses a lot of similar concepts: modules, decorators, dependency injection.
@@ -339,11 +393,14 @@ This is the **root module** — it imports all the other modules to connect them
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),  // reads .env file
+    ThrottlerModule.forRoot([...]),             // global rate-limiting
     PrismaModule,                               // global Prisma database client
+    LoggerModule,                               // global Winston logger
     AuthModule,
     UsersModule,
-    CloudinaryModule,
+    UploadModule,
     AdminModule,
+    ProductsModule,
   ],
 })
 export class AppModule {}
@@ -493,6 +550,27 @@ npm run db:seed       # seed the first admin user
 **Location:** `server/src/modules/auth/`
 
 Handles everything related to authentication: register, login, logout, password reset, token refresh.
+
+#### Module structure
+
+```
+auth/
+├── dto/
+│   └── register.dto.ts    ← Server-side Zod schema (no confirmPassword)
+├── interfaces/
+│   └── auth.interfaces.ts ← SafeUser, JwtPayload, AuthResult
+├── strategies/
+│   └── jwt.strategy.ts    ← Passport JWT strategy
+├── auth.controller.ts
+├── auth.service.ts
+├── auth.module.ts
+└── index.ts               ← barrel export
+```
+
+**Why a separate `register.dto.ts`?**
+The shared `registerSchema` (used on the frontend) includes `confirmPassword` for client-side validation. The server schema strips that field — it has no meaning on the server and should never be required. Having it in a dedicated `dto/` file makes this explicit and testable independently.
+
+**`interfaces/auth.interfaces.ts`** centralises the `SafeUser` type (User without password fields), `JwtPayload` (JWT token shape) and `AuthResult` (what login/register return) so both `auth.service.ts` and `jwt.strategy.ts` share the same types without duplication.
 
 #### `auth.module.ts`
 
@@ -647,6 +725,22 @@ When a request comes in with `Authorization: Bearer eyJhbGci...`:
 
 Handles CRUD operations on user accounts.
 
+#### Module structure
+
+```
+users/
+├── dto/
+│   ├── update-profile.dto.ts   ← re-exports updateProfileSchema from @app/shared
+│   ├── change-password.dto.ts  ← re-exports changePasswordSchema from @app/shared
+│   └── change-role.dto.ts      ← changeRoleDtoSchema (Role enum validation)
+├── interfaces/
+│   └── users.interfaces.ts     ← PaginationQuery, PaginatedUsers, SafeUser
+├── users.controller.ts
+├── users.service.ts
+├── users.module.ts
+└── index.ts                    ← barrel export
+```
+
 #### `users.controller.ts`
 
 All routes require `JwtAuthGuard` (must be logged in) and `RolesGuard` (must have the right role).
@@ -750,38 +844,89 @@ Open your browser, find the user in the `users` table, and change their `role` f
 
 ---
 
-### Cloudinary Module
+### Upload Module
 
-**Location:** `server/src/modules/cloudinary/`
+**Location:** `server/src/modules/upload/`
 
-Cloudinary is a cloud service that stores images. This module enables avatar uploads.
+The Upload module abstracts all Cloudinary interactions behind a provider-agnostic interface. The controller is registered at `/api/upload` and the service is exported so `ProductsModule` can perform server-side image uploads.
 
-**The secure upload flow** (avoids storing Cloudinary credentials in the browser):
+#### Module structure
+
+```
+upload/
+├── interfaces/
+│   └── upload.interfaces.ts   ← SignedUploadParams, UploadedImageResult
+├── upload.controller.ts
+├── upload.service.ts
+├── upload.module.ts
+└── index.ts                   ← barrel export
+```
+
+#### `upload.controller.ts` — routes
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload/avatar` | Bearer | Returns a signed upload payload for direct browser → Cloudinary upload |
+| `DELETE` | `/api/upload/avatar` | Bearer | Deletes an avatar image from Cloudinary by `publicId` |
+| `POST` | `/api/upload/image` | Admin | Server-side upload (multipart/form-data, `image` field) |
+| `DELETE` | `/api/upload/image` | Admin | Deletes any image by `publicId` |
+
+#### `upload.service.ts`
+
+```ts
+uploadImage(buffer: Buffer, folder?: string): Promise<UploadedImageResult>
+generateSignedUploadParams(publicId: string): SignedUploadParams
+deleteImage(publicId: string): Promise<void>
+```
+
+**The secure avatar upload flow** (API secret never leaves the server):
 
 ```
 Browser                         API Server                    Cloudinary
-  |                                 |                              |
-  |  POST /api/upload/avatar        |                              |
-  |-------------------------------->|                              |
-  |                                 |  generate signature          |
-  |  { signature, timestamp,        |  (with API secret)           |
-  |    apiKey, cloudName, publicId }|                              |
-  |<--------------------------------|                              |
-  |                                 |                              |
-  |  POST directly to Cloudinary    |                              |
-  |  (using the signature)          |                              |
-  |------------------------------------------->|                  |
-  |  { secure_url: "https://res.cloudinary..." }|                  |
-  |<-------------------------------------------|                  |
-  |                                 |                              |
-  |  PATCH /api/users/:id           |                              |
-  |  { avatar: "https://..." }      |                              |
-  |-------------------------------->|                              |
+  │                                 │                              │
+  │  POST /api/upload/avatar        │                              │
+  │  { publicId: "avatar-abc" }     │                              │
+  │────────────────────────────────►│                              │
+  │                                 │  HMAC-sign request params    │
+  │  { signature, timestamp,        │  using CLOUDINARY_API_SECRET │
+  │    apiKey, cloudName, publicId }│                              │
+  │◄────────────────────────────────│                              │
+  │                                 │                              │
+  │  POST directly to Cloudinary    │                              │
+  │  (file + signature)             │                              │
+  │─────────────────────────────────────────────────────────────► │
+  │  { secure_url: "https://res.cloudinary.com/..." }             │
+  │◄───────────────────────────────────────────────────────────── │
+  │                                 │                              │
+  │  PATCH /api/users/:id           │                              │
+  │  { avatar: "https://..." }      │                              │
+  │────────────────────────────────►│                              │
 ```
 
-The **API key** and **API secret** never leave the server. The browser only gets a time-limited cryptographic signature that allows a single upload.
+The `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` never leave the server. The browser only receives a time-limited HMAC signature for a single upload operation.
+
+#### `upload.interfaces.ts`
+
+```ts
+export interface SignedUploadParams {
+  signature: string;   // HMAC-SHA1 of the upload params
+  timestamp: number;   // Unix seconds — Cloudinary rejects signatures older than 1 hour
+  apiKey: string;      // Safe to expose — useless without the secret
+  cloudName: string;
+  publicId: string;
+  folder: string;      // "avatars"
+}
+
+export interface UploadedImageResult {
+  url: string;         // http:// variant
+  secureUrl: string;   // https:// variant (always use this one)
+  publicId: string;    // needed later for deletion
+}
+```
 
 ---
+
+### Admin Module
 
 ### Common Layer
 

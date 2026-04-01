@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import styles from './Button.module.css';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 type Size = 'xs' | 'sm' | 'lg' | 'full';
@@ -12,6 +13,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
 }
+
+const variantClass: Record<Variant, string> = {
+  primary: styles.primary,
+  secondary: styles.secondary,
+  ghost: styles.ghost,
+  danger: styles.danger,
+  success: styles.success,
+};
+
+const sizeClass: Record<Size, string> = {
+  xs: styles.xs,
+  sm: styles.sm,
+  lg: styles.lg,
+  full: styles.full,
+};
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
@@ -29,10 +45,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const classes = [
-      'btn',
-      `btn--${variant}`,
-      size ? `btn--${size}` : '',
-      isLoading ? 'btn--loading' : '',
+      styles.btn,
+      variantClass[variant],
+      size ? sizeClass[size] : '',
+      isLoading ? styles.loading : '',
       className,
     ]
       .filter(Boolean)

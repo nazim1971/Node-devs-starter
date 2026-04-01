@@ -6,6 +6,7 @@ import '../styles/utilities.css';
 import '../styles/dashboard.css';
 import { ThemeProvider } from '../src/providers/ThemeProvider';
 import { AuthProvider } from '../src/providers/AuthProvider';
+import { QueryProvider } from '../src/providers/QueryProvider';
 
 export const metadata: Metadata = {
   title: 'Node Devs Admin Dashboard',
@@ -20,9 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

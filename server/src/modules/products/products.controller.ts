@@ -17,7 +17,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ProductsService } from "./products.service";
-import { CloudinaryService } from "../cloudinary/cloudinary.service";
+import { UploadService } from "../upload/upload.service";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -44,7 +44,7 @@ const imageInterceptor = FileInterceptor("image", {
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly uploadService: UploadService,
   ) {}
 
   // ── Public endpoints ───────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export class ProductsController {
     let imagePublicId: string | null = null;
 
     if (file) {
-      const uploaded = await this.cloudinaryService.uploadImage(
+      const uploaded = await this.uploadService.uploadImage(
         file.buffer,
         "products",
       );
@@ -132,7 +132,7 @@ export class ProductsController {
     let imagePublicId: string | undefined;
 
     if (file) {
-      const uploaded = await this.cloudinaryService.uploadImage(
+      const uploaded = await this.uploadService.uploadImage(
         file.buffer,
         "products",
       );

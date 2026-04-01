@@ -8,8 +8,8 @@ import {
   HttpStatus,
   BadRequestException,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { Request } from "express";
-import { z } from "zod";
 import {
   loginSchema,
   forgotPasswordSchema,
@@ -23,27 +23,17 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { User } from "@prisma/client";
-
-// Server-side register schema — confirmPassword is client-only
-const registerServerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(100),
-  email: z.string().email("Invalid email address"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
-});
-type RegisterServerInput = z.infer<typeof registerServerSchema>;
+import { registerDtoSchema, type RegisterDto } from "./dto";
 
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.CREATED)
   async register(
-    @Body(new ZodValidationPipe(registerServerSchema)) dto: RegisterServerInput,
+    @Body(new ZodValidationPipe(registerDtoSchema)) dto: RegisterDto,
     @Req() req: Request,
   ) {
     const ip = req.ip ?? null;
@@ -53,6 +43,7 @@ export class AuthController {
   }
 
   @Post("login")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body(new ZodValidationPipe(loginSchema)) dto: LoginInput,

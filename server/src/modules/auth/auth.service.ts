@@ -19,14 +19,10 @@ import {
   ResetPasswordInput,
 } from "@app/shared";
 import { PrismaService } from "../../prisma/prisma.service";
+import type { SafeUser } from "./interfaces/auth.interfaces";
 
 const BCRYPT_ROUNDS = 12;
 const RESET_EXPIRES_MS = 60 * 60 * 1000; // 1 hour
-
-export type SafeUser = Omit<
-  User,
-  "password" | "passwordResetToken" | "passwordResetExpires"
->;
 
 @Injectable()
 export class AuthService {

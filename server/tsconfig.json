@@ -4,8 +4,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "strictPropertyInitialization": false,
-    "ignoreDeprecations": "5.0",
-    "types": ["multer", "node"]
+    "ignoreDeprecations": "6.0",
+    "types": ["jest", "multer", "node"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
